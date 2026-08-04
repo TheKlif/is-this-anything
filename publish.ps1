@@ -1,6 +1,6 @@
 # Publish script (markdown + auto index + dark styling)
 $source = "D:\Obsidian\Klif-Create\Is This Anything\Publish"
-$site   = Join-Path $PSScriptRoot "Is-This-Anything"
+$site = Join-Path $PSScriptRoot "docs"
 $backup = "E:\VibeCoding\itaBackups"
 $published = "D:\Obsidian\Klif-Create\Is This Anything\Published"
 $COMMITMSG = $env:COMMITMSG
