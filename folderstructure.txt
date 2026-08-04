@@ -1,0 +1,63 @@
+Folder PATH listing for volume APPS-DATA ST1000 HDD 1tb
+Volume serial number is 48CA-8EC8
+D:.
+|   .gitattributes
+|   folderstructure.txt
+|   index.html
+|   publish.bat
+|   publish.log
+|   publish.ps1
+|   
++---Is-This-Anything
+|   |   index.html
+|   |   style.css
+|   |   test.html
+|   |   _footer.html
+|   |   _header.html
+|   |   
+|   \---dnd
+|       +---characters
+|       |   |   anwen-mira-calder.html
+|       |   |   azrael-pyroxis-(doctor-fireworks).html
+|       |   |   bruce-tree..html
+|       |   |   caius-verity.html
+|       |   |   iago.html
+|       |   |   mama-bibi.html
+|       |   |   mike-peters,-baby-detective.html
+|       |   |   rowan-emberly.html
+|       |   |   the-mime-who-screams.html
+|       |   |   the-mortician-maestro.html
+|       |   |   
+|       |   \---attachments
+|       |           anwenmiracalder.png
+|       |           brucetree.png
+|       |           caiusverity.png
+|       |           doctorfireworks.png
+|       |           iago.png
+|       |           mamabibi.png
+|       |           mikepetersbabydetective.png
+|       |           rowanemberly.png
+|       |           themimewhoscreams.png
+|       |           themorticianmaestro.png
+|       |           
+|       +---hooks
+|       |       elf.html
+|       |       existential-crisis.html
+|       |       giant-tentacle.html
+|       |       moonflower-gang-war.html
+|       |       sweat,-bottled.html
+|       |       the-obelisk.html
+|       |       venice,-but-for-lay-lines.html
+|       |       
+|       \---items
+|               ring-of-detect-fire.html
+|               rusty-blade.html
+|               wand-of-magic-missiles.html
+|               
++---notes
+|       .gitkeep
+|       
+\---Publish
+        sample.html
+        sample.md
+        
