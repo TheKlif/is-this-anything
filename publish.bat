@@ -1,5 +1,5 @@
 @echo off
-cd /d "D:\Is This Anything\TheKlif.github.io"
+cd /d "%~dp0"
 
 set /p COMMITMSG="Enter publish reason: "
 
