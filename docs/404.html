@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Not Found - Is This Anything?</title>
+  <link rel='stylesheet' href='/is-this-anything/style.css'>
+</head>
+<body>
+<div class="main-content">
+  <h1>404: Nothing here</h1>
+  <p>That page doesn't exist. Maybe this does:</p>
+  <img id="random-attachment" alt="" style="display:none;">
+  <p><a href="/is-this-anything/index.html">Back to All Musings</a></p>
+</div>
+<script>
+  var images = ["/is-this-anything/dnd/characters/attachments/anwenmiracalder.png","/is-this-anything/dnd/characters/attachments/banjoblade.png","/is-this-anything/dnd/characters/attachments/brucetree.png","/is-this-anything/dnd/characters/attachments/brumnirstoutale.png","/is-this-anything/dnd/characters/attachments/caiusverity.png","/is-this-anything/dnd/characters/attachments/danumotallfellow.png","/is-this-anything/dnd/characters/attachments/dazthrool.png","/is-this-anything/dnd/characters/attachments/delvunironhands.png","/is-this-anything/dnd/characters/attachments/dirtydaerjl.png","/is-this-anything/dnd/characters/attachments/doctorfireworks.png","/is-this-anything/dnd/characters/attachments/iago.png","/is-this-anything/dnd/characters/attachments/mamabibi.png","/is-this-anything/dnd/characters/attachments/mikepetersbabydetective.png","/is-this-anything/dnd/characters/attachments/papabehrr.png","/is-this-anything/dnd/characters/attachments/phineasdraem.png","/is-this-anything/dnd/characters/attachments/rowanemberly.png","/is-this-anything/dnd/characters/attachments/themimewhoscreams.png","/is-this-anything/dnd/characters/attachments/themorticianmaestro.png","/is-this-anything/dnd/characters/attachments/VossAndPip.png","/is-this-anything/dnd/characters/attachments/zagreaafxbis.png"];
+  if (images.length > 0) {
+    var pick = images[Math.floor(Math.random() * images.length)];
+    var el = document.getElementById('random-attachment');
+    el.src = pick;
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
