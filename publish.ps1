@@ -4,32 +4,69 @@ $site = Join-Path $PSScriptRoot "docs"
 $backup = "E:\VibeCoding\itaBackups"
 $published = "D:\Obsidian\Klif-Create\Is This Anything\Published"
 $COMMITMSG = $env:COMMITMSG
+$enable_table_roller = $true
+
+# Logging (Category D - timestamp + level, color-coded console, persistent log file)
+$log_file = Join-Path $PSScriptRoot "publish_log.txt"
+
+function Write-Log {
+    param(
+        [string]$Message,
+        [ValidateSet("INFO", "WARN", "ERROR")]
+        [string]$Level = "INFO"
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $line = "$timestamp [$Level] $Message"
+
+    $color = switch ($Level) {
+        "INFO"  { "Green" }
+        "WARN"  { "Yellow" }
+        "ERROR" { "Red" }
+    }
+    Write-Host $line -ForegroundColor $color
+    Add-Content -Path $log_file -Value $line
+}
+
+function Html-Encode($s) {
+    return $s -replace '&','&amp;' -replace '"','&quot;' -replace '<','&lt;' -replace '>','&gt;'
+}
+
+# Trim log file: 30-day retention, age-based
+if (Test-Path $log_file) {
+    $cutoff = (Get-Date).AddDays(-30)
+    $lines = Get-Content $log_file
+    $kept = $lines | Where-Object {
+        try {
+            $ts = [datetime]::ParseExact($_.Substring(0, 19), "yyyy-MM-dd HH:mm:ss", $null)
+            $ts -ge $cutoff
+        } catch { $true }  # keep malformed lines rather than silently drop them
+    }
+    Set-Content -Path $log_file -Value $kept
+}
 
 # Backup before doing anything
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$backupDest = Join-Path $backup $timestamp
-Copy-Item -Path $site -Destination $backupDest -Recurse -Force
-Write-Host "Backup created: $backupDest"
+$backup_dest = Join-Path $backup $timestamp
+Copy-Item -Path $site -Destination $backup_dest -Recurse -Force
+Write-Log "Backup created: $backup_dest"
 
 # Clean up old backups: keep last 30 days and last 30 pushes
-$allBackups = Get-ChildItem -Path $backup -Directory | Sort-Object CreationTime
-$cutoffDate = (Get-Date).AddDays(-30)
-$recentBackups = $allBackups | Where-Object { $_.CreationTime -ge $cutoffDate }
-$oldBackups = $allBackups | Where-Object { $_.CreationTime -lt $cutoffDate }
+$all_backups = Get-ChildItem -Path $backup -Directory | Sort-Object CreationTime
+$cutoff_date = (Get-Date).AddDays(-30)
+$old_backups = $all_backups | Where-Object { $_.CreationTime -lt $cutoff_date }
 # Keep at least 30 most recent regardless of age
-$keepCount = 30
-if ($allBackups.Count -gt $keepCount) {
-    $toDelete = $allBackups | Select-Object -First ($allBackups.Count - $keepCount)
-    foreach ($dir in $toDelete) {
-        if ($dir.CreationTime -lt $cutoffDate) {
+$keep_count = 30
+if ($all_backups.Count -gt $keep_count) {
+    $to_delete = $all_backups | Select-Object -First ($all_backups.Count - $keep_count)
+    foreach ($dir in $to_delete) {
+        if ($dir.CreationTime -lt $cutoff_date) {
             Remove-Item -Path $dir.FullName -Recurse -Force
-            Write-Host "Deleted old backup: $($dir.Name)"
+            Write-Log "Deleted old backup: $($dir.Name)"
         }
     }
 }
 
-# Track conversion errors
-$publishErrors = @()
+$publish_errors = @()
 
 # add the Publish folder if it doesn't already exist, so errors don't happen
 if (-not (Test-Path $source)) {
@@ -40,28 +77,28 @@ if (-not (Test-Path $source)) {
 Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
     $relative = $_.FullName.Substring($source.Length + 1)
     $dir      = Split-Path $relative
-    $targetDir = Join-Path $site ($dir.ToLower())
-    if (!(Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir }
+    $target_dir = Join-Path $site ($dir.ToLower())
+    if (!(Test-Path $target_dir)) { New-Item -ItemType Directory -Path $target_dir }
     $slug  = $_.BaseName -replace ' ', '-'
     $slug  = $slug.ToLower()
     $title = "$($_.BaseName) - Is This Anything?"
-    $output = Join-Path $targetDir ($slug + ".html")
+    $output = Join-Path $target_dir ($slug + ".html")
 
     # Read markdown (do not modify source)
     $content = Get-Content $_.FullName -Raw
     # force blank line before headings that follow content
     $content = $content -replace "(.*)\r?\n(#)", "$1`n`n#"
 
-    Write-Host "Processing file: $($_.FullName)"
+    Write-Log "Processing file: $($_.FullName)"
 
     # Convert Obsidian [!info] callouts to Pandoc div blocks
     $pattern = '(?ms)^\s*>\s*\[!info\]\s*(.*?)\r?\n((?:\s*>\s*.*\r?\n?)*)'
     $content = [regex]::Replace($content, $pattern, {
         param($match)
-        $titleText = $match.Groups[1].Value.Trim()
+        $title_text = $match.Groups[1].Value.Trim()
         $body  = $match.Groups[2].Value
         $body = $body -replace '(?m)^\s*>\s?', ''
-        return "`n::: {.info}`n`n**$titleText**`n`n$body`n:::`n"
+        return "`n::: {.info}`n`n**$title_text**`n`n$body`n:::`n"
     })
 
     # Convert Obsidian wikilink image syntax to standard markdown, adding attachments/ prefix
@@ -77,6 +114,55 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         return "![]($path)"
     })
 
+    # Broken-attachment check
+    $attachment_dir = Join-Path $_.DirectoryName "attachments"
+    $referenced = [regex]::Matches($content, '!\[\]\(attachments/([^)]+)\)') | ForEach-Object {
+        [uri]::UnescapeDataString($_.Groups[1].Value)
+    }
+    foreach ($img in $referenced) {
+        $img_path = Join-Path $attachment_dir $img
+        if (-not (Test-Path $img_path)) {
+            $publish_errors += "$($_.FullName): missing attachment '$img'"
+            Write-Log "Missing attachment '$img' referenced in $($_.FullName)" -Level ERROR
+        }
+    }
+
+    # Auto-extract an OG description from the first real paragraph
+    $plain_paragraphs = $content -split "`r?`n`r?`n" | Where-Object {
+        $t = $_.Trim()
+        $t -ne "" -and $t -notmatch '^#' -and $t -notmatch '^!\[' -and $t -notmatch '^:::'
+    }
+    $description = ""
+    if ($plain_paragraphs.Count -gt 0) {
+        $description = ($plain_paragraphs[0] -replace '[*_`]', '' -replace '\s+', ' ').Trim()
+        if ($description.Length -gt 155) {
+            $description = $description.Substring(0, 155).Trim() + "..."
+        }
+    }
+
+    $rel_dir = $target_dir.Substring((Resolve-Path $site).Path.Length).TrimStart('\').Replace('\','/')
+    $og_url = "https://theklif.github.io/is-this-anything/$rel_dir/$slug.html"
+
+    $og_image = ""
+    $img_match = [regex]::Match($content, '!\[\]\(attachments/([^)]+)\)')
+    if ($img_match.Success) {
+        $og_image = "https://theklif.github.io/is-this-anything/$rel_dir/attachments/" + $img_match.Groups[1].Value
+    }
+
+    $og_tags = "<meta property=`"og:title`" content=`"$(Html-Encode $title)`">`n"
+    $og_tags += "<meta property=`"og:type`" content=`"article`">`n"
+    $og_tags += "<meta property=`"og:url`" content=`"$og_url`">`n"
+    if ($description -ne "") {
+        $og_tags += "<meta property=`"og:description`" content=`"$(Html-Encode $description)`">`n"
+    }
+    if ($og_image -ne "") {
+        $og_tags += "<meta property=`"og:image`" content=`"$og_image`">`n"
+    }
+    $og_tags += "<meta name=`"twitter:card`" content=`"summary_large_image`">"
+    if ($enable_table_roller) {
+        $og_tags += "`n<script src=`"/is-this-anything/roller.js`" defer></script>"
+    }
+
     # Write converted content to temp file for pandoc
     $temp = "$env:TEMP\publish_temp.md"
     Set-Content -Path $temp -Value $content -Encoding UTF8
@@ -89,19 +175,23 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         --include-before-body="$site\_header.html" `
         --include-after-body="$site\_footer.html" `
         --from=markdown
-    
+
     if ($LASTEXITCODE -ne 0) {
-        $publishErrors += $_.FullName
-        Write-Host "ERROR: Pandoc failed on $($_.FullName)"
+        $publish_errors += $_.FullName
+        Write-Log "Pandoc failed on $($_.FullName)" -Level ERROR
+    } else {
+        $html = Get-Content $output -Raw
+        $html = $html -replace '(<title>.*?</title>)', "`$1`n$og_tags"
+        Set-Content -Path $output -Value $html -Encoding UTF8
     }
     Pop-Location
 }
 
 # Abort if any conversions failed
-if ($publishErrors.Count -gt 0) {
-    Write-Host "Publish aborted due to errors in the following files:"
-    $publishErrors | ForEach-Object { Write-Host "  $_" }
-    Write-Host "No files were committed. Restore from backup if needed: $backupDest"
+if ($publish_errors.Count -gt 0) {
+    Write-Log "Publish aborted due to errors in the following files:" -Level ERROR
+    $publish_errors | ForEach-Object { Write-Log "  $_" -Level ERROR }
+    Write-Log "No files were committed. Restore from backup if needed: $backup_dest" -Level WARN
     pause
     exit 1
 }
@@ -121,19 +211,24 @@ $index = @"
   <h1>All Musings</h1>
 "@
 
+$new_cutoff = (Get-Date).AddDays(-30)
 $groups = @{}
 Get-ChildItem -Path $site -Recurse -Include "*.html" |
-    Where-Object { $_.Name -notin @("index.html", "test.html", "_header.html", "_footer.html") } |
+    Where-Object { $_.Name -notin @("index.html", "test.html", "404.html", "_header.html", "_footer.html") } |
     ForEach-Object {
         $full = $_.FullName
-        $baseSite = (Resolve-Path $site).Path
-        $rel = $full.Substring($baseSite.Length).TrimStart("\").Replace("\", "/")
+        $base_site = (Resolve-Path $site).Path
+        $rel = $full.Substring($base_site.Length).TrimStart("\").Replace("\", "/")
         $folder = Split-Path $rel -Parent
         if ([string]::IsNullOrWhiteSpace($folder)) { $folder = "uncategorized" }
         if (-not $groups.ContainsKey($folder)) { $groups[$folder] = @() }
-        $titleText = $_.BaseName -replace '-', ' '
-        $titleText = (Get-Culture).TextInfo.ToTitleCase($titleText)
-        $groups[$folder] += "<li><a href='$rel'>$titleText</a></li>"
+        $title_text = $_.BaseName -replace '-', ' '
+        $title_text = (Get-Culture).TextInfo.ToTitleCase($title_text)
+        $badge = ""
+        if ($_.LastWriteTime -ge $new_cutoff) {
+            $badge = " <span class='new-badge'>New</span>"
+        }
+        $groups[$folder] += "<li><a href='$rel'>$title_text</a>$badge</li>"
     }
 
 foreach ($group in ($groups.GetEnumerator() | Sort-Object Name)) {
@@ -158,6 +253,45 @@ $index += @"
 
 Set-Content "$site/index.html" $index
 
+# 404 page with a random attachment image, regenerated every run
+$attachment_images = Get-ChildItem -Path $site -Recurse -Include "*.png","*.jpg","*.jpeg","*.gif","*.webp" -File |
+    Where-Object { $_.FullName -match '\\attachments\\' } |
+    ForEach-Object {
+        $base_site = (Resolve-Path $site).Path
+        "/is-this-anything/" + $_.FullName.Substring($base_site.Length).TrimStart("\").Replace("\", "/")
+    }
+$images_json = ($attachment_images | ForEach-Object { "`"$_`"" }) -join ","
+
+$not_found = @"
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Not Found - Is This Anything?</title>
+  <link rel='stylesheet' href='/is-this-anything/style.css'>
+</head>
+<body>
+<div class="main-content">
+  <h1>404: Nothing here</h1>
+  <p>That page doesn't exist. Maybe this does:</p>
+  <img id="random-attachment" alt="" style="display:none;">
+  <p><a href="/is-this-anything/index.html">Back to All Musings</a></p>
+</div>
+<script>
+  var images = [$images_json];
+  if (images.length > 0) {
+    var pick = images[Math.floor(Math.random() * images.length)];
+    var el = document.getElementById('random-attachment');
+    el.src = pick;
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
+"@
+Set-Content "$site/404.html" $not_found
+
 # Copy attachment folders from source to site
 Get-ChildItem -Path $source -Recurse -Directory -Filter "attachments" | ForEach-Object {
     $relative = $_.FullName.Substring($source.Length + 1)
@@ -181,24 +315,26 @@ Get-ChildItem -Path $source -Recurse -Directory -Filter "attachments" | ForEach-
 # Move published source files to Published folder
 Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
     $relative = $_.FullName.Substring($source.Length + 1)
-    $destFile = Join-Path $published $relative
-    $destDir = Split-Path $destFile
-    if (!(Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force }
-    Move-Item -Path $_.FullName -Destination $destFile -Force
+    $dest_file = Join-Path $published $relative
+    $dest_dir = Split-Path $dest_file
+    if (!(Test-Path $dest_dir)) { New-Item -ItemType Directory -Path $dest_dir -Force }
+    Move-Item -Path $_.FullName -Destination $dest_file -Force
 }
 
 # Commit and push
 git add .
 git commit -m $COMMITMSG
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: git commit failed."
+    Write-Log "git commit failed." -Level ERROR
     exit 1
 }
 git push
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: git push failed."
+    Write-Log "git push failed." -Level ERROR
     exit 1
 }
+
+Write-Log "Publish complete. Reason: $COMMITMSG"
 
 Write-Host ""
 Write-Host ""

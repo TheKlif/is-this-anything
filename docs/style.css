@@ -202,6 +202,31 @@ footer {
   border-top: 1px solid var(--border);
   font-size: 0.85rem;
   color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+footer p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3em;
+}
+
+footer img {
+  margin: 0;
+  border-radius: 0;
+  filter: invert(0.85) opacity(0.6);
+  vertical-align: middle;
+  transition: opacity 0.2s ease;
+}
+
+footer img:hover {
+  opacity: 1;
 }
 
 footer a {
@@ -258,11 +283,61 @@ body {
   clear: both;
 }
 
-@media (max-width: 600px) {
-  .main-content > p:first-of-type img:only-child {
-    float: none;
-    width: 100%;
-    max-height: 35vh;
-    margin: 0 0 1rem 0;
+/* Print stylesheet */
+@media print {
+  .site-nav, footer, .table-roll-btn { display: none; }
+  body { background: #fff; color: #000; }
+  a { color: #000; text-decoration: underline; border-bottom: none; }
+  .main-content { max-width: 100%; padding: 0; }
+  h1, h2, h3 { color: #000; }
+  .info, blockquote {
+    background: #f4f4f4;
+    border-left-color: #999;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+  img { max-width: 100%; page-break-inside: avoid; }
+}
+
+/* "New" badge on index entries (30-day window, set in publish.ps1) */
+.new-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 3px;
+  padding: 0.1em 0.4em;
+  margin-left: 0.4em;
+  vertical-align: middle;
+}
+
+/* 404 page random image */
+#random-attachment {
+  max-height: 50vh;
+}
+
+/* Table roller */
+.table-roll-btn {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 0.4em 0.9em;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  font-family: 'Atkinson Hyperlegible', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.table-roll-btn:hover {
+  opacity: 0.85;
+}
+
+table tr.rolled {
+  background: var(--card-bg);
+  outline: 2px solid var(--accent);
 }
