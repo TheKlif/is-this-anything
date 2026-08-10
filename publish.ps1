@@ -15,6 +15,7 @@ function Write-Log {
         [ValidateSet("INFO", "WARN", "ERROR")]
         [string]$Level = "INFO"
     )
+    if ([string]::IsNullOrWhiteSpace($Message)) { return }
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "$timestamp [$Level] $Message"
 
