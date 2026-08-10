@@ -113,7 +113,7 @@ $index = @"
 <head>
   <meta charset='UTF-8'>
   <title>All Musings</title>
-  <link rel='stylesheet' href='/Is-This-Anything/style.css'>
+  <link rel='stylesheet' href='/is-this-anything/style.css'>
 </head>
 <body>
 <div class="main-content">
@@ -189,7 +189,15 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
 # Commit and push
 git add .
 git commit -m $COMMITMSG
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: git commit failed."
+    exit 1
+}
 git push
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: git push failed."
+    exit 1
+}
 
 Write-Host ""
 Write-Host ""
