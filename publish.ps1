@@ -1,8 +1,18 @@
 # Publish script (markdown + auto index + dark styling)
-$source = "D:\Obsidian\Klif-Create\Is This Anything\Publish"
+param(
+    # When set, regenerates HTML for every already-published page (read
+    # from $published) instead of just new content in $publish_folder,
+    # to pick up template/header/footer/OG-tag changes on old pages.
+    # Skips the move/copy steps below, since that content already lives
+    # in Published - there's nothing to move.
+    [switch]$RepublishAll
+)
+
+$publish_folder = "D:\Obsidian\Klif-Create\Is This Anything\Publish"
+$published = "D:\Obsidian\Klif-Create\Is This Anything\Published"
+$source = if ($RepublishAll) { $published } else { $publish_folder }
 $site = Join-Path $PSScriptRoot "docs"
 $backup = "E:\VibeCoding\itaBackups"
-$published = "D:\Obsidian\Klif-Create\Is This Anything\Published"
 $COMMITMSG = $env:COMMITMSG
 $enable_table_roller = $true
 
@@ -70,8 +80,8 @@ if ($all_backups.Count -gt $keep_count) {
 $publish_errors = @()
 
 # add the Publish folder if it doesn't already exist, so errors don't happen
-if (-not (Test-Path $source)) {
-    New-Item -ItemType Directory -Path $source | Out-Null
+if (-not (Test-Path $publish_folder)) {
+    New-Item -ItemType Directory -Path $publish_folder | Out-Null
 }
 
 # Convert markdown to HTML (slugified, lowercase)
@@ -168,6 +178,14 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
     $temp = "$env:TEMP\publish_temp.md"
     Set-Content -Path $temp -Value $content -Encoding UTF8
 
+    # Preserve the existing page's mtime in republish mode, so
+    # regenerating old pages doesn't make every one of them falsely
+    # show the index's "New" badge for the next 30 days.
+    $original_mtime = $null
+    if ($RepublishAll -and (Test-Path $output)) {
+        $original_mtime = (Get-Item $output).LastWriteTime
+    }
+
     Push-Location $source
     pandoc $temp -o $output `
         --standalone `
@@ -184,6 +202,9 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         $html = Get-Content $output -Raw
         $html = $html -replace '(<title>.*?</title>)', "`$1`n$og_tags"
         Set-Content -Path $output -Value $html -Encoding UTF8
+        if ($original_mtime) {
+            (Get-Item $output).LastWriteTime = $original_mtime
+        }
     }
     Pop-Location
 }
@@ -303,23 +324,29 @@ Get-ChildItem -Path $source -Recurse -Directory -Filter "attachments" | ForEach-
     Copy-Item -Path (Join-Path $_.FullName '*') -Destination $dest -Recurse -Force
 }
 
-# Move attachment folders from Publish to Published
-Get-ChildItem -Path $source -Recurse -Directory -Filter "attachments" | ForEach-Object {
-    $relative = $_.FullName.Substring($source.Length + 1)
-    $dest = Join-Path $published $relative
-    if (!(Test-Path $dest)) {
-        New-Item -ItemType Directory -Path $dest -Force
+# Move attachment folders from Publish to Published (skipped in
+# republish mode - content already lives in Published, nowhere to move it)
+if (-not $RepublishAll) {
+    Get-ChildItem -Path $source -Recurse -Directory -Filter "attachments" | ForEach-Object {
+        $relative = $_.FullName.Substring($source.Length + 1)
+        $dest = Join-Path $published $relative
+        if (!(Test-Path $dest)) {
+            New-Item -ItemType Directory -Path $dest -Force
+        }
+        Move-Item -Path (Join-Path $_.FullName '*') -Destination $dest -Force
     }
-    Move-Item -Path (Join-Path $_.FullName '*') -Destination $dest -Force
 }
 
-# Move published source files to Published folder
-Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
-    $relative = $_.FullName.Substring($source.Length + 1)
-    $dest_file = Join-Path $published $relative
-    $dest_dir = Split-Path $dest_file
-    if (!(Test-Path $dest_dir)) { New-Item -ItemType Directory -Path $dest_dir -Force }
-    Move-Item -Path $_.FullName -Destination $dest_file -Force
+# Move published source files to Published folder (skipped in
+# republish mode - same reason as above)
+if (-not $RepublishAll) {
+    Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
+        $relative = $_.FullName.Substring($source.Length + 1)
+        $dest_file = Join-Path $published $relative
+        $dest_dir = Split-Path $dest_file
+        if (!(Test-Path $dest_dir)) { New-Item -ItemType Directory -Path $dest_dir -Force }
+        Move-Item -Path $_.FullName -Destination $dest_file -Force
+    }
 }
 
 # Commit and push
