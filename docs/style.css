@@ -10,6 +10,17 @@
   --muted: #9db8a8;
 }
 
+/* Accessible mode: near-black/near-white, toggled via a class on <html>
+   (not <body>, so html's own background picks it up too). Accent is
+   unchanged - #FF8C42 already runs ~8.6:1 contrast against #0A0A0A. */
+:root.accessible-mode {
+  --bg: #0A0A0A;
+  --text: #F5F5F5;
+  --card-bg: #1A1A1A;
+  --border: #333333;
+  --muted: #B0B0B0;
+}
+
 /* Base */
 html {
   background: var(--bg);
