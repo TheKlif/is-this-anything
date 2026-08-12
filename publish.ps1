@@ -233,7 +233,7 @@ $index = @"
   <h1>All Musings</h1>
 "@
 
-$new_cutoff = (Get-Date).AddDays(-30)
+$new_cutoff = (Get-Date).AddDays(-7)
 $groups = @{}
 Get-ChildItem -Path $site -Recurse -Include "*.html" |
     Where-Object { $_.Name -notin @("index.html", "test.html", "404.html", "_header.html", "_footer.html") } |
