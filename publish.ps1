@@ -229,6 +229,20 @@ $index = @"
   <link rel='stylesheet' href='/is-this-anything/style.css'>
 </head>
 <body>
+<nav class="site-nav" style="display:flex;align-items:center;">
+  <button id="a11y-toggle" class="table-roll-btn" style="margin-left:auto;" aria-label="Toggle high-contrast mode">Aa</button>
+</nav>
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('a11y-toggle');
+  if (localStorage.getItem('accessibleMode') === '1') root.classList.add('accessible-mode');
+  btn.addEventListener('click', function () {
+    var on = root.classList.toggle('accessible-mode');
+    localStorage.setItem('accessibleMode', on ? '1' : '0');
+  });
+})();
+</script>
 <div class="main-content">
   <h1>All Musings</h1>
 "@
