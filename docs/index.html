@@ -7,6 +7,20 @@
   <link rel='stylesheet' href='/is-this-anything/style.css'>
 </head>
 <body>
+<nav class="site-nav" style="display:flex;align-items:center;">
+  <button id="a11y-toggle" class="table-roll-btn" style="margin-left:auto;" aria-label="Toggle high-contrast mode">Aa</button>
+</nav>
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('a11y-toggle');
+  if (localStorage.getItem('accessibleMode') === '1') root.classList.add('accessible-mode');
+  btn.addEventListener('click', function () {
+    var on = root.classList.toggle('accessible-mode');
+    localStorage.setItem('accessibleMode', on ? '1' : '0');
+  });
+})();
+</script>
 <div class="main-content">
   <h1>All Musings</h1><p class='category-parent'>Dnd</p><h2 class='category-child'>Characters</h2><ul>
 <li><a href='dnd/characters/aldric.html'>Aldric</a></li>
@@ -79,7 +93,7 @@
 <p class='category-parent'>Scum And Villainy</p><h2 class='category-child'>Characters</h2><ul>
 <li><a href='scum and villainy/characters/ed-x.html'>Ed X</a></li>
 </ul>
-<p class='last-updated'>Last updated: 2026.08.12.21.14.24</p>
+<p class='last-updated'>Last updated: 2026.08.15.06.00.10</p>
 </div>
 </body>
 </html>
