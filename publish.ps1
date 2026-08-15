@@ -92,6 +92,15 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
     if (!(Test-Path $target_dir)) { New-Item -ItemType Directory -Path $target_dir }
     $slug  = $_.BaseName -replace ' ', '-'
     $slug  = $slug.ToLower()
+    # Strip characters Windows won't allow in a filename at all - defensive;
+    # a stray one here would otherwise crash New-Item/pandoc outright rather
+    # than just looking odd.
+    $slug  = $slug -replace '[<>:"/\\|?*]', ''
+    # Windows also silently disallows a filename ending in a period or
+    # space. Without this, a title like "Bruce Tree." collides with the
+    # appended ".html" into a literal double dot (bruce-tree..html) - a
+    # real bug hit in production, not a hypothetical one.
+    $slug  = $slug.TrimEnd('. ')
     $title = "$($_.BaseName) - Is This Anything?"
     $output = Join-Path $target_dir ($slug + ".html")
 
