@@ -334,8 +334,8 @@ $feed_entries = ($feed_items | Sort-Object PubDate -Descending | Select-Object -
     @"
   <item>
     <title>$(Html-Encode $_.Title)</title>
-    <link>$($_.Link)</link>
-    <guid>$($_.Link)</guid>
+    <link>$(Html-Encode $_.Link)</link>
+    <guid>$(Html-Encode $_.Link)</guid>
     <description>$($_.Description)</description>
     <pubDate>$pub_rfc822</pubDate>
   </item>
