@@ -42,6 +42,20 @@ function Html-Encode($s) {
     return $s -replace '&','&amp;' -replace '"','&quot;' -replace '<','&lt;' -replace '>','&gt;'
 }
 
+# Returns the article's first git-commit date for RSS pubDate. Falls back
+# to "now" when the file has no history yet (e.g. this is the same run
+# that's about to commit it for the first time) - by the time git commit
+# actually runs a few steps later, that timestamp will be seconds off
+# from this fallback at most.
+function Get-FirstCommitDate($repo_relative_path) {
+    $log = git log --follow --diff-filter=A --format=%aI --reverse -- "$repo_relative_path" 2>$null
+    if ($log) {
+        $oldest = ($log -split "`r?`n")[0]
+        return Get-Date $oldest
+    }
+    return Get-Date
+}
+
 # Trim log file: 30-day retention, age-based
 if (Test-Path $log_file) {
     $cutoff = (Get-Date).AddDays(-30)
@@ -179,6 +193,7 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         $og_tags += "<meta property=`"og:image`" content=`"$og_image`">`n"
     }
     $og_tags += "<meta name=`"twitter:card`" content=`"summary_large_image`">"
+    $og_tags += "`n<link rel=`"alternate`" type=`"application/rss+xml`" title=`"Is This Anything? Feed`" href=`"/is-this-anything/feed.xml`">"
     if ($enable_table_roller) {
         $og_tags += "`n<script src=`"/is-this-anything/roller.js`" defer></script>"
     }
@@ -236,6 +251,7 @@ $index = @"
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>All Musings</title>
   <link rel='stylesheet' href='/is-this-anything/style.css'>
+  <link rel='alternate' type='application/rss+xml' title='Is This Anything? Feed' href='/is-this-anything/feed.xml'>
 </head>
 <body>
 <nav class="site-nav" style="display:flex;align-items:center;">
@@ -258,6 +274,7 @@ $index = @"
 
 $new_cutoff = (Get-Date).AddDays(-7)
 $groups = @{}
+$feed_items = @()
 Get-ChildItem -Path $site -Recurse -Include "*.html" |
     Where-Object { $_.Name -notin @("index.html", "test.html", "404.html", "_header.html", "_footer.html") } |
     ForEach-Object {
@@ -274,6 +291,19 @@ Get-ChildItem -Path $site -Recurse -Include "*.html" |
             $badge = " <span class='new-badge'>New</span>"
         }
         $groups[$folder] += "<li><a href='$rel'>$title_text</a>$badge</li>"
+
+        # Feed item: reuse the og:description already embedded in this
+        # page's <head> as the excerpt, so there's no second pass over
+        # the source markdown.
+        $page_html = Get-Content $full -Raw
+        $desc_match = [regex]::Match($page_html, 'property="og:description" content="([^"]*)"')
+        $excerpt = if ($desc_match.Success) { $desc_match.Groups[1].Value } else { "" }
+        $feed_items += [pscustomobject]@{
+            Title       = $title_text
+            Link        = "https://theklif.github.io/is-this-anything/$rel"
+            Description = $excerpt
+            PubDate     = Get-FirstCommitDate "docs/$rel"
+        }
     }
 
 foreach ($group in ($groups.GetEnumerator() | Sort-Object Name)) {
@@ -297,6 +327,33 @@ $index += @"
 "@
 
 Set-Content "$site/index.html" $index
+
+# RSS feed - latest 20 items by first-commit date
+$feed_entries = ($feed_items | Sort-Object PubDate -Descending | Select-Object -First 20 | ForEach-Object {
+    $pub_rfc822 = $_.PubDate.ToUniversalTime().ToString("R")
+    @"
+  <item>
+    <title>$(Html-Encode $_.Title)</title>
+    <link>$($_.Link)</link>
+    <guid>$($_.Link)</guid>
+    <description>$($_.Description)</description>
+    <pubDate>$pub_rfc822</pubDate>
+  </item>
+"@
+}) -join "`n"
+
+$feed_xml = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Is This Anything?</title>
+  <link>https://theklif.github.io/is-this-anything/index.html</link>
+  <description>Homebrew D&amp;D content from #iTA</description>
+$feed_entries
+</channel>
+</rss>
+"@
+Set-Content "$site/feed.xml" $feed_xml -Encoding UTF8
 
 # 404 page with a random attachment image, regenerated every run
 $attachment_images = Get-ChildItem -Path $site -Recurse -Include "*.png","*.jpg","*.jpeg","*.gif","*.webp" -File |
