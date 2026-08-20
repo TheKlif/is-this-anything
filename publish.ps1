@@ -161,8 +161,12 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         }
     }
 
-    # Auto-extract an OG description from the first real paragraph
-    $plain_paragraphs = $content -split "`r?`n`r?`n" | Where-Object {
+    # Auto-extract an OG description from the first real paragraph.
+    # Strip a leading YAML frontmatter block first - old notes still
+    # carry one, and with no blank lines inside it, it otherwise reads
+    # as a single paragraph that slips past the filters below.
+    $content_for_excerpt = $content -replace '(?s)^\s*---\r?\n.*?\r?\n---\r?\n', ''
+    $plain_paragraphs = $content_for_excerpt -split "`r?`n`r?`n" | Where-Object {
         $t = $_.Trim()
         $t -ne "" -and $t -notmatch '^#' -and $t -notmatch '^!\[' -and $t -notmatch '^:::'
     }
