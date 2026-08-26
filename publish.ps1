@@ -119,7 +119,7 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
     $output = Join-Path $target_dir ($slug + ".html")
 
     # Read markdown (do not modify source)
-    $content = Get-Content $_.FullName -Raw
+    $content = Get-Content $_.FullName -Raw -Encoding UTF8
     # force blank line before headings that follow content
     $content = $content -replace "(.*)\r?\n(#)", "$1`n`n#"
 
@@ -221,7 +221,7 @@ Get-ChildItem -Path $source -Recurse -Include "*.md" | ForEach-Object {
         --metadata title="$title" `
         --include-before-body="$site\_header.html" `
         --include-after-body="$site\_footer.html" `
-        --from=markdown
+        --from=markdown+hard_line_breaks+lists_without_preceding_blankline
 
     if ($LASTEXITCODE -ne 0) {
         $publish_errors += $_.FullName
