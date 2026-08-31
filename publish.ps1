@@ -433,6 +433,12 @@ if (-not $RepublishAll) {
     }
 }
 
+Get-ChildItem $draftsPath -Recurse -Directory | Where-Object {
+    (Get-ChildItem $_.FullName -Force | Measure-Object).Count -eq 0
+} | ForEach-Object {
+    New-Item -Path (Join-Path $_.FullName "_keep.md") -ItemType File -Force | Out-Null
+}
+
 # Commit and push
 git add .
 git commit -m $COMMITMSG
